@@ -19,7 +19,7 @@ const eth_ropsten_rpc = 'https://ropsten.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4
 const network_eth_ropsten = {
     provider: () => new HDWalletProvider(privateKey, eth_ropsten_rpc),
     network_id: 3,
-    gas: 550000,
+    gas: 3000000,
     gasPrice: 40000000000, // 40 Gwei
     confirmations: 0,
     timeoutBlocks: 200,
@@ -34,7 +34,10 @@ const network_development = {
 
 module.exports = {
   networks: {
+    eth_mainnet_o3token: network_eth_mainnet,
     eth_mainnet_o3staking: network_eth_mainnet,
+
+    eth_ropsten_o3token: network_eth_ropsten,
     eth_ropsten_o3staking: network_eth_ropsten,
 
     development: network_development
