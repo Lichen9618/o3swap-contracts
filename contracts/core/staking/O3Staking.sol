@@ -11,6 +11,7 @@ import "../../libs/token/ERC20/SafeERC20.sol";
 
 contract O3Staking is Context, Ownable, ReentrancyGuard {
     using SafeMath for uint;
+    using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
     struct StakingRecord {
@@ -91,16 +92,16 @@ contract O3Staking is Context, Ownable, ReentrancyGuard {
 
         uint currentProfitAccumu = _unitProfitAccumu[block.number];
         if (_upBlockIndex < block.number) {
-            uint unitProfitIncrease = _unitProfit * (block.number - _upBlockIndex);
-            currentProfitAccumu = _unitProfitAccumu[_upBlockIndex] + unitProfitIncrease;
+            uint unitProfitIncrease = _unitProfit.mul(block.number.sub(_upBlockIndex));
+            currentProfitAccumu = _unitProfitAccumu[_upBlockIndex].add(unitProfitIncrease);
         }
 
         StakingRecord storage rec = _stakingRecords[staker];
 
         uint preUnitProfit = _unitProfitAccumu[rec.blockIndex];
-        uint currentProfit = (currentProfitAccumu - preUnitProfit) * rec.staked / ONE;
+        uint currentProfit = (currentProfitAccumu.sub(preUnitProfit)).mul(rec.staked.div(ONE));
 
-        return rec.totalProfit + currentProfit;
+        return rec.totalProfit.add(currentProfit);
     }
 
     function getStakingAmount(address staker) external view returns (uint) {
@@ -125,13 +126,13 @@ contract O3Staking is Context, Ownable, ReentrancyGuard {
         require(!_stakingPaused, "O3Staking: STAKING_PAUSED");
         require(amount > 0, "O3Staking: INVALID_STAKING_AMOUNT");
 
-        totalStaked += amount;
+        totalStaked = amount.add(totalStaked);
         _updateUnitProfitState();
 
         StakingRecord storage rec = _stakingRecords[_msgSender()];
 
         uint userTotalProfit = _settleCurrentUserProfit(_msgSender());
-        _updateUserStakingRecord(_msgSender(), rec.staked + amount, userTotalProfit);
+        _updateUserStakingRecord(_msgSender(), rec.staked.add(amount), userTotalProfit);
 
         emit LOG_STAKE(_msgSender(), amount);
 
@@ -146,11 +147,11 @@ contract O3Staking is Context, Ownable, ReentrancyGuard {
         require(amount > 0, "O3Staking: ZERO_UNSTAKE_AMOUNT");
         require(amount <= rec.staked, "O3Staking: UNSTAKE_AMOUNT_EXCEEDED");
 
-        totalStaked -= amount;
+        totalStaked = amount.sub(totalStaked);
         _updateUnitProfitState();
 
         uint userTotalProfit = _settleCurrentUserProfit(_msgSender());
-        _updateUserStakingRecord(_msgSender(), rec.staked - amount, userTotalProfit);
+        _updateUserStakingRecord(_msgSender(), rec.staked.sub(amount), userTotalProfit);
 
         emit LOG_UNSTAKE(_msgSender(), amount);
 
@@ -199,9 +200,9 @@ contract O3Staking is Context, Ownable, ReentrancyGuard {
 
         uint preUnitProfit = _unitProfitAccumu[rec.blockIndex];
         uint currUnitProfit = _unitProfitAccumu[block.number];
-        uint currentProfit = (currUnitProfit - preUnitProfit) * rec.staked / ONE;
+        uint currentProfit = (currUnitProfit.sub(preUnitProfit)).mul(rec.staked.div(ONE));
 
-        return rec.totalProfit + currentProfit;
+        return rec.totalProfit.add(currentProfit);
     }
 
     function _updateUnitProfitState() internal {
@@ -212,8 +213,8 @@ contract O3Staking is Context, Ownable, ReentrancyGuard {
         }
 
         // Accumulate unit profit.
-        uint unitStakeProfitIncrease = _unitProfit * (currentBlockIndex - _upBlockIndex);
-        _unitProfitAccumu[currentBlockIndex] = unitStakeProfitIncrease + _unitProfitAccumu[_upBlockIndex];
+        uint unitStakeProfitIncrease = _unitProfit.mul(currentBlockIndex.sub(_upBlockIndex));
+        _unitProfitAccumu[currentBlockIndex] = unitStakeProfitIncrease.add(_unitProfitAccumu[_upBlockIndex]);
 
         _upBlockIndex = block.number;
 
@@ -227,7 +228,7 @@ contract O3Staking is Context, Ownable, ReentrancyGuard {
 
     function _updateUnitProfit() internal {
         if (totalStaked > 0) {
-            _unitProfit = _sharePerBlock * ONE / totalStaked;
+            _unitProfit = _sharePerBlock.mul(ONE.div(totalStaked));
         }
     }
 

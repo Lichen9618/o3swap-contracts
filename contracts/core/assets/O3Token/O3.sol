@@ -106,17 +106,14 @@ contract O3 is Context, ERC20, Ownable, IO3, ReentrancyGuard {
     function transfer(address recipient, uint256 amount) public override(ERC20, IERC20) returns (bool) {
         _transfer(_msgSender(), recipient, amount);
         _unlockTransfer(_msgSender(), recipient, amount);
-
         return true;
     }
 
     function transferFrom(address sender, address recipient, uint256 amount) public override(ERC20, IERC20) returns (bool) {
         _transfer(sender, recipient, amount);
         _unlockTransfer(sender, recipient, amount);
-
         uint256 allowance = allowance(sender, _msgSender());
         _approve(sender, _msgSender(), allowance.sub(amount, "O3: TRANSFER_AMOUNT_EXCEEDED"));
-
         return true;
     }
 
@@ -133,46 +130,33 @@ contract O3 is Context, ERC20, Ownable, IO3, ReentrancyGuard {
     function stake(address token, uint256 amount) external override nonReentrant returns (bool) {
         require(_unlockFactor[token] > 0, "O3: FACTOR_NOT_SET");
         require(_unlockBlockGap[token] > 0, "O3: BLOCK_GAP_NOT_SET");
-
         _pullToken(token, _msgSender(), amount);
-
         LpStakeInfo storage info = _stakingRecords[_msgSender()][token];
-
         uint256 unlockedAmount = _settleUnlockAmount(_msgSender(), token, info.amountStaked, info.blockNumber);
-        _updateStakeRecord(_msgSender(), token, info.amountStaked + amount);
+        _updateStakeRecord(_msgSender(), token, info.amountStaked.add(amount));
         _mintUnlocked(_msgSender(), unlockedAmount);
-
         emit LOG_STAKE(_msgSender(), token, amount);
-
         return true;
     }
 
     function unstake(address token, uint256 amount) external override nonReentrant returns (bool) {
         require(amount > 0, "O3: ZERO_UNSTAKE_AMOUNT");
-
         LpStakeInfo storage info = _stakingRecords[_msgSender()][token];
         require(amount <= info.amountStaked, "O3: UNSTAKE_AMOUNT_EXCEEDED");
-
         uint256 unlockedAmount = _settleUnlockAmount(_msgSender(), token, info.amountStaked, info.blockNumber);
-        _updateStakeRecord(_msgSender(), token, info.amountStaked - amount);
+        _updateStakeRecord(_msgSender(), token, info.amountStaked.sub(amount));
         _mintUnlocked(_msgSender(), unlockedAmount);
-
         _pushToken(token, _msgSender(), amount);
-
         emit LOG_UNSTAKE(_msgSender(), token, amount);
-
         return true;
     }
 
     function claimUnlocked(address token) external override nonReentrant returns (bool) {
         LpStakeInfo storage info = _stakingRecords[_msgSender()][token];
-
         uint256 unlockedAmount = _settleUnlockAmount(_msgSender(), token, info.amountStaked, info.blockNumber);
         _updateStakeRecord(_msgSender(), token, info.amountStaked);
         _mintUnlocked(_msgSender(), unlockedAmount);
-
         emit LOG_CLAIM_UNLOCKED(_msgSender(), unlockedAmount);
-
         return true;
     }
 
@@ -203,18 +187,15 @@ contract O3 is Context, ERC20, Ownable, IO3, ReentrancyGuard {
         uint256 blocks = block.number.sub(upToBlockNumber);
         uint256 unlockedAmount = unlockSpeed.mul(blocks).div(FACTOR_DENOMINATOR);
         uint256 lockedAmount = lockedOf(staker);
-
         if (unlockedAmount > lockedAmount) {
             unlockedAmount = lockedAmount;
         }
-
         return unlockedAmount;
     }
 
     function _mintUnlocked(address recipient, uint256 amount) internal {
         _unlocks[recipient] = _unlocks[recipient].add(amount);
-        _totalUnlocked = _totalUnlocked + amount;
-
+        _totalUnlocked = _totalUnlocked.add(amount);
         emit LOG_UNLOCK_TRANSFER(address(0), recipient, amount);
     }
 
@@ -222,21 +203,17 @@ contract O3 is Context, ERC20, Ownable, IO3, ReentrancyGuard {
         uint256 toBeUnlocked = lockedOf(staker);
         uint256 unlockSpeed = _unlockFactor[token].mul(lpStaked);
         uint256 maxUnlockSpeed = toBeUnlocked.div(_unlockBlockGap[token]).mul(FACTOR_DENOMINATOR);
-
         if(unlockSpeed > maxUnlockSpeed) {
             unlockSpeed = maxUnlockSpeed;
         }
-
         return unlockSpeed;
     }
 
     function _unlockTransfer(address sender, address recipient, uint256 amount) internal {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
-
         _unlocks[sender] = _unlocks[sender].sub(amount, "ERC20: transfer amount exceeds unlocked balance");
         _unlocks[recipient] = _unlocks[recipient].add(amount);
-
         emit LOG_UNLOCK_TRANSFER(sender, recipient, amount);
     }
 
